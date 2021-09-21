@@ -21,11 +21,17 @@ namespace cAlgo.Robots
         [Parameter("Take Profit Price", Group = "Default Trade parameters")]
         public double TakeProfitPrice { get; set; }
 
+        [Parameter("Entry Price", Group = "Default Trade parameters")]
+        public double EntryPrice { get; set; }
+
         [Parameter("Volume", Group = "Default Trade parameters", DefaultValue = 2000)]
         public int Volume { get; set; }
 
         [Parameter("Trail ATR", Group = "Default Trade parameters", DefaultValue = 1.5)]
         public double TrailAtr { get; set; }
+
+        [Parameter("Expire After (Minutes)", Group = "Default Trade parameters", DefaultValue = 1)]
+        public int ExpireAfterMinutes { get; set; }
 
         [Parameter("Period", Group = "ATR parameters", DefaultValue = 14)]
         public int AtrPeriod { get; set; }
@@ -43,9 +49,9 @@ namespace cAlgo.Robots
 
             averageTrueRange = Indicators.AverageTrueRange(AtrPeriod, AtrMaType);
 
-            tradingPanel = new TradingPanel(this, StopLossPrice, TakeProfitPrice, Volume, TrailAtr, averageTrueRange);
+            tradingPanel = new TradingPanel(this, StopLossPrice, TakeProfitPrice, EntryPrice, Volume, TrailAtr, ExpireAfterMinutes, averageTrueRange);
 
-            var border = new Border 
+            var border = new Border
             {
                 VerticalAlignment = PanelVerticalAlignment,
                 HorizontalAlignment = PanelHorizontalAlignment,
@@ -71,7 +77,7 @@ namespace cAlgo.Robots
                     {
                         double atrTrailPositionPrice = Symbol.Bid - atrSnapshotValue * trailAtrSnapshot;
                         if (atrTrailPositionPrice > remainingPosition.StopLoss)
-						{
+                        {
                             remainingPosition.ModifyStopLossPrice(atrTrailPositionPrice);
                             Print("Successfully Trailed.");
                         }
@@ -80,7 +86,7 @@ namespace cAlgo.Robots
                     {
                         double atrTrailPositionPrice = Symbol.Ask + atrSnapshotValue * trailAtrSnapshot;
                         if (atrTrailPositionPrice < remainingPosition.StopLoss)
-						{
+                        {
                             remainingPosition.ModifyStopLossPrice(atrTrailPositionPrice);
                             Print("Successfully Trailed.");
                         }
@@ -111,15 +117,15 @@ namespace cAlgo.Robots
                     double atrSnapshotValue = tradingPanel.GetOutputInfoValue("AtrValueSnapshotKey");
                     double trailAtrSnapshot = tradingPanel.GetOutputInfoValue("TrailAtrSnapshotKey");
                     if (remainingPosition.TradeType == TradeType.Buy)
-					{
+                    {
                         double atrTrailPositionPrice = Symbol.Bid - atrSnapshotValue * trailAtrSnapshot;
                         if (atrTrailPositionPrice > remainingPosition.EntryPrice)
                             remainingPosition.ModifyStopLossPrice(atrTrailPositionPrice);
                         else
                             remainingPosition.ModifyStopLossPrice(remainingPosition.EntryPrice + Symbol.PipSize);
-                    } 
+                    }
                     else
-					{
+                    {
                         double atrTrailPositionPrice = Symbol.Ask + atrSnapshotValue * trailAtrSnapshot;
                         if (atrTrailPositionPrice < remainingPosition.EntryPrice)
                             remainingPosition.ModifyStopLossPrice(atrTrailPositionPrice);
@@ -135,8 +141,10 @@ namespace cAlgo.Robots
         {
             private const string TakeProfitPriceInputKey = "TakeProfitPriceKey";
             private const string StopLossPriceInputKey = "StopLossPriceKey";
+            private const string EntryPriceInputKey = "EntryPriceKey";
             private const string VolumeInputKey = "VolumeKey";
             private const string TrailAtrInputKey = "TrailAtrKey";
+            private const string ExpireAfterMinutesInputKey = "ExpireAfterMinutesKey";
             private readonly IDictionary<string, TextBox> _inputMap = new Dictionary<string, TextBox>();
             private readonly Robot _robot;
             private const string AtrValueSnapshotOutputKey = "AtrValueSnapshotKey";
@@ -144,21 +152,21 @@ namespace cAlgo.Robots
             private AverageTrueRange _averageTrueRange;
             private readonly IDictionary<string, TextBlock> _outputMap = new Dictionary<string, TextBlock>();
 
-            public TradingPanel(Robot robot, double takeProfitPrice, double stopLossPrice, double volume, double trailAtr, AverageTrueRange averageTrueRange)
+            public TradingPanel(Robot robot, double takeProfitPrice, double stopLossPrice, double entryPrice, double volume, double trailAtr, int expireAfterMinutes, AverageTrueRange averageTrueRange)
             {
                 _robot = robot;
                 _averageTrueRange = averageTrueRange;
-                AddChild(CreateTradingPanel(takeProfitPrice, stopLossPrice, volume, trailAtr));
+                AddChild(CreateTradingPanel(takeProfitPrice, stopLossPrice, entryPrice, volume, trailAtr, expireAfterMinutes));
             }
 
-            private ControlBase CreateTradingPanel(double takeProfitPrice, double stopLossPrice, double volume, double trailAtr)
+            private ControlBase CreateTradingPanel(double takeProfitPrice, double stopLossPrice, double entryPrice, double volume, double trailAtr, int expireAfterMinutes)
             {
                 var mainPanel = new StackPanel();
 
                 var header = CreateHeader();
                 mainPanel.AddChild(header);
 
-                var contentPanel = CreateContentPanel(takeProfitPrice, stopLossPrice, volume, trailAtr);
+                var contentPanel = CreateContentPanel(takeProfitPrice, stopLossPrice, entryPrice, volume, trailAtr, expireAfterMinutes);
                 mainPanel.AddChild(contentPanel);
 
                 var infoPanel = CreateInfoPanel();
@@ -169,13 +177,13 @@ namespace cAlgo.Robots
 
             private ControlBase CreateHeader()
             {
-                var headerBorder = new Border 
+                var headerBorder = new Border
                 {
                     BorderThickness = "0 0 0 1",
                     Style = Styles.CreateCommonBorderStyle()
                 };
 
-                var header = new TextBlock 
+                var header = new TextBlock
                 {
                     Text = "Trading Panel",
                     Margin = "10 7",
@@ -186,9 +194,9 @@ namespace cAlgo.Robots
                 return headerBorder;
             }
 
-            private StackPanel CreateContentPanel(double takeProfitPrice, double stopLossPrice, double volume, double trailAtr)
+            private StackPanel CreateContentPanel(double takeProfitPrice, double stopLossPrice, double entryPrice, double volume, double trailAtr, int expireAfterMinutes)
             {
-                var contentPanel = new StackPanel 
+                var contentPanel = new StackPanel
                 {
                     Margin = 10
                 };
@@ -213,6 +221,12 @@ namespace cAlgo.Robots
                 var takeProfitInput = CreateInputWithLabel("Take Profit", "", TakeProfitPriceInputKey);
                 grid.AddChild(takeProfitInput, 2, 2);
 
+                var entryInput = CreateInputWithLabel("Entry", "", EntryPriceInputKey);
+                grid.AddChild(entryInput, 3, 0);
+
+                var expireAfterMinutesInput = CreateInputWithLabel("Expire (Minutes)", expireAfterMinutes.ToString(), ExpireAfterMinutesInputKey);
+                grid.AddChild(expireAfterMinutesInput, 3, 2);
+
                 contentPanel.AddChild(grid);
 
                 return contentPanel;
@@ -220,7 +234,7 @@ namespace cAlgo.Robots
 
             private Button CreateTradeButton(string text, Style style, TradeType tradeType)
             {
-                var tradeButton = new Button 
+                var tradeButton = new Button
                 {
                     Text = text,
                     Style = style,
@@ -234,18 +248,18 @@ namespace cAlgo.Robots
 
             private Panel CreateInputWithLabel(string label, string defaultValue, string inputKey)
             {
-                var stackPanel = new StackPanel 
+                var stackPanel = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
                     Margin = "0 10 0 0"
                 };
 
-                var textBlock = new TextBlock 
+                var textBlock = new TextBlock
                 {
                     Text = label
                 };
 
-                var input = new TextBox 
+                var input = new TextBox
                 {
                     Margin = "0 5 0 0",
                     Text = defaultValue,
@@ -262,13 +276,13 @@ namespace cAlgo.Robots
 
             private StackPanel CreateInfoPanel()
             {
-                var infoPanel = new StackPanel 
+                var infoPanel = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
                     Margin = 10
                 };
 
-                var infoHeader = new TextBlock 
+                var infoHeader = new TextBlock
                 {
                     Text = "Snapshot Info",
                     Margin = "10 7",
@@ -288,18 +302,18 @@ namespace cAlgo.Robots
 
             private Panel CreateInfoTextWithLabel(string label, string defaultValue, string outputKey)
             {
-                var stackPanel = new StackPanel 
+                var stackPanel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
                     Margin = "0 10 0 0"
                 };
 
-                var labelTextBlock = new TextBlock 
+                var labelTextBlock = new TextBlock
                 {
                     Text = label
                 };
 
-                var infoTextBlock = new TextBlock 
+                var infoTextBlock = new TextBlock
                 {
                     Text = defaultValue
                 };
@@ -318,6 +332,8 @@ namespace cAlgo.Robots
                 double volume = GetValueFromInput(VolumeInputKey, 0);
                 double stopLossPrice = GetValueFromInput(StopLossPriceInputKey, 0);
                 double takeProfitPrice = GetValueFromInput(TakeProfitPriceInputKey, 0);
+                double entryPrice = GetValueFromInput(EntryPriceInputKey, 0);
+                int expireAfterMinutes = (int)GetValueFromInput(ExpireAfterMinutesInputKey, 0);
 
                 // verify volume
                 if (volume == 0)
@@ -333,12 +349,16 @@ namespace cAlgo.Robots
 
                 if (stopLossPrice == 0)
                 {
-                    // try to find if user got draw stop loss line.
+                    _robot.Print("You must specify Stop Loss in trading panel!");
+                    return;
+                    // TODO: try to find if user got draw stop loss line, and then take stop loss value from there.
                 }
 
                 if (takeProfitPrice == 0)
                 {
-                    // try to find if user got draw take profit line.
+                    _robot.Print("You must specify Take Profit in trading panel!");
+                    return;
+                    // TODO: try to find if user got draw take profit line, and then take take profit value from there.
                 }
 
                 // verify take profit and stop loss
@@ -353,18 +373,71 @@ namespace cAlgo.Robots
                     return;
                 }
 
+                // verify entry price
+                if (entryPrice != 0)
+				{
+                    if (tradeType == TradeType.Buy && (entryPrice < stopLossPrice || entryPrice > takeProfitPrice))
+                    {
+                        _robot.Print("Entry price must be greater than stop loss price and smaller than take profit price in Sell order.");
+                        return;
+                    }
+                    else if (entryPrice != 0 && tradeType == TradeType.Sell && (entryPrice > stopLossPrice || entryPrice < takeProfitPrice))
+                    {
+                        _robot.Print("Entry price must be smaller than stop loss price and greater than take profit price in Buy order.");
+                        return;
+                    }
+                }
+
                 // change volume into tradable volume size.
                 double volumeHalf = _robot.Symbol.NormalizeVolumeInUnits(volume / 2, RoundingMode.Down);
 
                 double ask = _robot.Symbol.Ask;
                 double bid = _robot.Symbol.Bid;
                 double pipSize = _robot.Symbol.PipSize;
-                double basePrice = tradeType == TradeType.Buy ? ask : bid;
-                double stopLossPips = tradeType == TradeType.Buy ? (ask - stopLossPrice) / pipSize : (stopLossPrice - bid) / pipSize;
-                double takeProfitPips = tradeType == TradeType.Buy ? (takeProfitPrice - ask) / pipSize : (bid - takeProfitPrice) / pipSize;
 
-                _robot.ExecuteMarketRangeOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, 0, basePrice, label, stopLossPips, takeProfitPips);
-                _robot.ExecuteMarketRangeOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, 0, basePrice, label, stopLossPips, null);
+                DateTime expiry = _robot.Server.Time.AddMinutes(expireAfterMinutes);
+
+                if (entryPrice == 0)
+                {
+                    double basePrice = tradeType == TradeType.Buy ? ask : bid;
+                    double stopLossPips = tradeType == TradeType.Buy ? (ask - stopLossPrice) / pipSize : (stopLossPrice - bid) / pipSize;
+                    double takeProfitPips = tradeType == TradeType.Buy ? (takeProfitPrice - ask) / pipSize : (bid - takeProfitPrice) / pipSize;
+                    _robot.ExecuteMarketRangeOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, 0, basePrice, label, stopLossPips, takeProfitPips);
+                    _robot.ExecuteMarketRangeOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, 0, basePrice, label, stopLossPips, null);
+                }
+                else
+                {
+                    if (tradeType == TradeType.Buy)
+                    {
+                        double stopLossPips = (entryPrice - stopLossPrice) / pipSize;
+                        double takeProfitPips = (takeProfitPrice - entryPrice) / pipSize;
+                        if (entryPrice <= ask)
+                        {
+                            _robot.PlaceLimitOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, takeProfitPips, expiry);
+                            _robot.PlaceLimitOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, null, expiry);
+                        }
+                        else
+                        {
+                            _robot.PlaceStopOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, takeProfitPips, expiry);
+                            _robot.PlaceStopOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, null, expiry);
+                        }
+                    }
+                    else
+                    {
+                        double stopLossPips = (stopLossPrice - entryPrice) / pipSize;
+                        double takeProfitPips = (entryPrice - takeProfitPrice) / pipSize;
+                        if (entryPrice >= bid)
+                        {
+                            _robot.PlaceLimitOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, takeProfitPips, expiry);
+                            _robot.PlaceLimitOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, null, expiry);
+                        }
+                        else
+                        {
+                            _robot.PlaceStopOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, takeProfitPips, expiry);
+                            _robot.PlaceStopOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, null, expiry);
+                        }
+                    }
+                }
 
                 UpdateOutputInfo(AtrValueSnapshotOutputKey, _averageTrueRange.Result.LastValue.ToString());
                 UpdateOutputInfo(TrailAtrSnapshotOutputKey, GetValueFromInput(TrailAtrInputKey, 0).ToString());
@@ -383,10 +456,10 @@ namespace cAlgo.Robots
             }
 
             public double GetOutputInfoValue(string outputKey)
-			{
+            {
                 double value;
                 return double.TryParse(_outputMap[outputKey].Text, out value) ? value : 0;
-			}
+            }
 
         }
 
