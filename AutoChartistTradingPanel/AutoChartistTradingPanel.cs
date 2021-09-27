@@ -51,7 +51,7 @@ namespace cAlgo.Robots
 
             tradingPanel = new TradingPanel(this, StopLossPrice, TakeProfitPrice, EntryPrice, Volume, TrailAtr, ExpireAfterMinutes, averageTrueRange);
 
-            var border = new Border
+            var border = new Border 
             {
                 VerticalAlignment = PanelVerticalAlignment,
                 HorizontalAlignment = PanelHorizontalAlignment,
@@ -150,7 +150,7 @@ namespace cAlgo.Robots
             private const string AtrValueSnapshotOutputKey = "AtrValueSnapshotKey";
             private const string TrailAtrSnapshotOutputKey = "TrailAtrSnapshotKey";
             private AverageTrueRange _averageTrueRange;
-            private readonly IDictionary<string, TextBlock> _outputMap = new Dictionary<string, TextBlock>();
+            private readonly IDictionary<string, TextBox> _outputMap = new Dictionary<string, TextBox>();
 
             public TradingPanel(Robot robot, double takeProfitPrice, double stopLossPrice, double entryPrice, double volume, double trailAtr, int expireAfterMinutes, AverageTrueRange averageTrueRange)
             {
@@ -169,6 +169,9 @@ namespace cAlgo.Robots
                 var contentPanel = CreateContentPanel(takeProfitPrice, stopLossPrice, entryPrice, volume, trailAtr, expireAfterMinutes);
                 mainPanel.AddChild(contentPanel);
 
+                var infoHeader = CreateInfoHeader();
+                mainPanel.AddChild(infoHeader);
+
                 var infoPanel = CreateInfoPanel();
                 mainPanel.AddChild(infoPanel);
 
@@ -177,13 +180,13 @@ namespace cAlgo.Robots
 
             private ControlBase CreateHeader()
             {
-                var headerBorder = new Border
+                var headerBorder = new Border 
                 {
                     BorderThickness = "0 0 0 1",
                     Style = Styles.CreateCommonBorderStyle()
                 };
 
-                var header = new TextBlock
+                var header = new TextBlock 
                 {
                     Text = "Trading Panel",
                     Margin = "10 7",
@@ -196,7 +199,7 @@ namespace cAlgo.Robots
 
             private StackPanel CreateContentPanel(double takeProfitPrice, double stopLossPrice, double entryPrice, double volume, double trailAtr, int expireAfterMinutes)
             {
-                var contentPanel = new StackPanel
+                var contentPanel = new StackPanel 
                 {
                     Margin = 10
                 };
@@ -234,7 +237,7 @@ namespace cAlgo.Robots
 
             private Button CreateTradeButton(string text, Style style, TradeType tradeType)
             {
-                var tradeButton = new Button
+                var tradeButton = new Button 
                 {
                     Text = text,
                     Style = style,
@@ -247,6 +250,34 @@ namespace cAlgo.Robots
             }
 
             private Panel CreateInputWithLabel(string label, string defaultValue, string inputKey)
+            {
+                var stackPanel = new StackPanel 
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = "0 10 0 0"
+                };
+
+                var textBlock = new TextBlock 
+                {
+                    Text = label
+                };
+
+                var input = new TextBox 
+                {
+                    Margin = "0 5 0 0",
+                    Text = defaultValue,
+                    Style = Styles.CreateInputStyle()
+                };
+
+                _inputMap.Add(inputKey, input);
+
+                stackPanel.AddChild(textBlock);
+                stackPanel.AddChild(input);
+
+                return stackPanel;
+            }
+
+            private Panel CreateOutputWithLabel(string label, string defaultValue, string inputKey)
             {
                 var stackPanel = new StackPanel
                 {
@@ -266,7 +297,7 @@ namespace cAlgo.Robots
                     Style = Styles.CreateInputStyle()
                 };
 
-                _inputMap.Add(inputKey, input);
+                _outputMap.Add(inputKey, input);
 
                 stackPanel.AddChild(textBlock);
                 stackPanel.AddChild(input);
@@ -274,15 +305,15 @@ namespace cAlgo.Robots
                 return stackPanel;
             }
 
-            private StackPanel CreateInfoPanel()
+            /*private StackPanel CreateInfoPanel()
             {
-                var infoPanel = new StackPanel
+                var infoPanel = new StackPanel 
                 {
                     Orientation = Orientation.Vertical,
                     Margin = 10
                 };
 
-                var infoHeader = new TextBlock
+                var infoHeader = new TextBlock 
                 {
                     Text = "Snapshot Info",
                     Margin = "10 7",
@@ -298,22 +329,61 @@ namespace cAlgo.Robots
                 infoPanel.AddChild(atrTrailSnapshotInfo);
 
                 return infoPanel;
+            }*/
+
+            private ControlBase CreateInfoHeader()
+            {
+                var headerBorder = new Border
+                {
+                    BorderThickness = "0 0 0 1",
+                    Style = Styles.CreateCommonBorderStyle()
+                };
+
+                var header = new TextBlock
+                {
+                    Text = "Snapshot Info",
+                    Margin = "10 7",
+                    Style = Styles.CreateHeaderStyle()
+                };
+
+                headerBorder.Child = header;
+                return headerBorder;
             }
 
-            private Panel CreateInfoTextWithLabel(string label, string defaultValue, string outputKey)
+            private StackPanel CreateInfoPanel()
             {
-                var stackPanel = new StackPanel
+                var infoPanel = new StackPanel
+                {
+                    Margin = 10
+                };
+                var grid = new Grid(1, 3);
+                grid.Columns[1].SetWidthInPixels(5);
+
+                var atrValueSnapshotInfo = CreateOutputWithLabel("ATR Value: ", "", AtrValueSnapshotOutputKey);
+                grid.AddChild(atrValueSnapshotInfo, 0, 0);
+
+                var atrTrailSnapshotInfo = CreateOutputWithLabel("ATR Trail: ", "", TrailAtrSnapshotOutputKey);
+                grid.AddChild(atrTrailSnapshotInfo, 0, 2);
+
+                infoPanel.AddChild(grid);
+
+                return infoPanel;
+            }
+
+            /*private Panel CreateInfoTextWithLabel(string label, string defaultValue, string outputKey)
+            {
+                var stackPanel = new StackPanel 
                 {
                     Orientation = Orientation.Horizontal,
                     Margin = "0 10 0 0"
                 };
 
-                var labelTextBlock = new TextBlock
+                var labelTextBlock = new TextBlock 
                 {
                     Text = label
                 };
 
-                var infoTextBlock = new TextBlock
+                var infoTextBlock = new TextBlock 
                 {
                     Text = defaultValue
                 };
@@ -324,7 +394,7 @@ namespace cAlgo.Robots
                 stackPanel.AddChild(infoTextBlock);
 
                 return stackPanel;
-            }
+            }*/
 
             private void ExecuteOrderAsync(TradeType tradeType)
             {
@@ -375,7 +445,7 @@ namespace cAlgo.Robots
 
                 // verify entry price
                 if (entryPrice != 0)
-				{
+                {
                     if (tradeType == TradeType.Buy && (entryPrice < stopLossPrice || entryPrice > takeProfitPrice))
                     {
                         _robot.Print("Entry price must be greater than stop loss price and smaller than take profit price in Sell order.");
