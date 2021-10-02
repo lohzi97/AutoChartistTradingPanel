@@ -428,12 +428,16 @@ namespace cAlgo.Robots
                 if (stopLossPrice == 0)
                 {
                     stopLossPrice = tradeType == TradeType.Buy ? ask - atr * _stopLossAtr : bid + atr * _stopLossAtr;
+                    // round to correct decimal places
+                    stopLossPrice = Math.Round(stopLossPrice, _robot.Symbol.Digits);
                 }
 
                 // use ATR for stopLoss if takeProfitPrice is empty
                 if (takeProfitPrice == 0)
                 {
                     takeProfitPrice = tradeType == TradeType.Buy ? ask + atr * _takeProfitAtr : bid - atr * _takeProfitAtr;
+                    // round to correct decimal places
+                    takeProfitPrice = Math.Round(takeProfitPrice, _robot.Symbol.Digits);
                 }
 
                 // verify take profit and stop loss
@@ -472,7 +476,9 @@ namespace cAlgo.Robots
                 {
                     double basePrice = tradeType == TradeType.Buy ? ask : bid;
                     double stopLossPips = tradeType == TradeType.Buy ? (ask - stopLossPrice) / pipSize : (stopLossPrice - bid) / pipSize;
+                    stopLossPips = Math.Round(stopLossPips, 1);
                     double takeProfitPips = tradeType == TradeType.Buy ? (takeProfitPrice - ask) / pipSize : (bid - takeProfitPrice) / pipSize;
+                    takeProfitPips = Math.Round(takeProfitPips, 1);
                     _robot.ExecuteMarketRangeOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, 0, basePrice, label, stopLossPips, takeProfitPips);
                     _robot.ExecuteMarketRangeOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, 0, basePrice, label, stopLossPips, null);
                 }
