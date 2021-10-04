@@ -487,7 +487,9 @@ namespace cAlgo.Robots
                     if (tradeType == TradeType.Buy)
                     {
                         double stopLossPips = (entryPrice - stopLossPrice) / pipSize;
+                        stopLossPips = Math.Round(stopLossPips, 1);
                         double takeProfitPips = (takeProfitPrice - entryPrice) / pipSize;
+                        takeProfitPips = Math.Round(takeProfitPips, 1);
                         if (entryPrice <= ask)
                         {
                             _robot.PlaceLimitOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, takeProfitPips, expiry);
@@ -502,7 +504,9 @@ namespace cAlgo.Robots
                     else
                     {
                         double stopLossPips = (stopLossPrice - entryPrice) / pipSize;
+                        stopLossPips = Math.Round(stopLossPips, 1);
                         double takeProfitPips = (entryPrice - takeProfitPrice) / pipSize;
+                        takeProfitPips = Math.Round(takeProfitPips, 1);
                         if (entryPrice >= bid)
                         {
                             _robot.PlaceLimitOrderAsync(tradeType, _robot.Symbol.Name, volumeHalf, entryPrice, label, stopLossPips, takeProfitPips, expiry);
