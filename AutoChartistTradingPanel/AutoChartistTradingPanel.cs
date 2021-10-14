@@ -1,12 +1,15 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using cAlgo.API;
 using cAlgo.API.Internals;
 using cAlgo.API.Indicators;
+using System.Reflection;
+using System.Linq;
 
 namespace cAlgo.Robots
 {
-    [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
+    [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.FullAccess)]
     public class AutoChartistTradingPanel : Robot
     {
         [Parameter("Vertical Position", Group = "Panel alignment", DefaultValue = VerticalAlignment.Bottom)]
@@ -36,9 +39,13 @@ namespace cAlgo.Robots
         [Parameter("Moving Average", Group = "ATR parameters", DefaultValue = MovingAverageType.Exponential)]
         public MovingAverageType AtrMaType { get; set; }
 
+        [Parameter("File Path", Group = "Storage", DefaultValue = "D:\\Downloads HDD\\storage.csv")]
+        public String StorageFilePath { get; set; }
+
         private const string label = "AutoChartistTradingPanel";
         private AverageTrueRange averageTrueRange;
         TradingPanel tradingPanel;
+        CsvFile csvFile;
 
         protected override void OnStart()
         {
@@ -46,7 +53,9 @@ namespace cAlgo.Robots
 
             averageTrueRange = Indicators.AverageTrueRange(AtrPeriod, AtrMaType);
 
-            tradingPanel = new TradingPanel(this, Volume, TrailStopAtr, StopLossAtr, TakeProfitAtr, ExpireAfterMinutes, averageTrueRange);
+            csvFile = new CsvFile(this, StorageFilePath);
+
+            tradingPanel = new TradingPanel(this, csvFile, Volume, TrailStopAtr, StopLossAtr, TakeProfitAtr, ExpireAfterMinutes, averageTrueRange);
 
             var border = new Border 
             {
@@ -144,6 +153,7 @@ namespace cAlgo.Robots
             private const string ExpireAfterMinutesInputKey = "ExpireAfterMinutesKey";
             private readonly IDictionary<string, TextBox> _inputMap = new Dictionary<string, TextBox>();
             private readonly Robot _robot;
+            private CsvFile _csvFile;
             private const string AtrValueSnapshotOutputKey = "AtrValueSnapshotKey";
             private const string TrailStopAtrSnapshotOutputKey = "TrailStopAtrSnapshotKey";
             private AverageTrueRange _averageTrueRange;
@@ -151,9 +161,10 @@ namespace cAlgo.Robots
             private double _stopLossAtr;
             private double _takeProfitAtr;
 
-            public TradingPanel(Robot robot, double volume, double trailStopAtr, double stopLossAtr, double takeProfitAtr, int expireAfterMinutes, AverageTrueRange averageTrueRange)
+            public TradingPanel(Robot robot, CsvFile csvFile, double volume, double trailStopAtr, double stopLossAtr, double takeProfitAtr, int expireAfterMinutes, AverageTrueRange averageTrueRange)
             {
                 _robot = robot;
+                _csvFile = csvFile;
                 _averageTrueRange = averageTrueRange;
                 _stopLossAtr = stopLossAtr;
                 _takeProfitAtr = takeProfitAtr;
@@ -519,6 +530,13 @@ namespace cAlgo.Robots
                 UpdateOutputInfo(AtrValueSnapshotOutputKey, atr.ToString());
                 //UpdateOutputInfo(TrailStopAtrSnapshotOutputKey, GetValueFromInput(TrailAtrInputKey, 0).ToString());
 
+                StoredSymbolData storedSymbolData = new StoredSymbolData()
+                {
+                    Symbol = _robot.Symbol.Name,
+                    AtrValue = atr
+                };
+                _csvFile.UpdateFile(storedSymbolData);
+
             }
 
             private double GetValueFromInput(string inputKey, double defaultValue)
@@ -616,5 +634,143 @@ namespace cAlgo.Robots
             }
         }
 
+        public class CsvFile
+        {
+            private string _storageFilePath;
+            private readonly Robot _robot;
+            private List<StoredSymbolData> storedSymbolDatas = new List<StoredSymbolData>();
+
+            public CsvFile(Robot robot, string storageFilePath)
+            {
+                _robot = robot;
+                _storageFilePath = storageFilePath;
+                if (!Init())
+                {
+                    throw new Exception("Failed init.");
+                }
+            }
+
+            private bool Init()
+            {
+                bool result;
+                if (File.Exists(_storageFilePath))
+                {
+                    // read the storage json file if it already exist.
+                    result = ReadFromFile();
+                }
+                else
+                {
+                    // make a new storage json file if it is absent.
+                    result = WriteToFile();
+                }
+                return result;
+            }
+
+            private bool ReadFromFile()
+            {
+                // clear the storage json file for clean read.
+                storedSymbolDatas.Clear();
+                try
+                {
+                    using (StreamReader sr = new StreamReader(_storageFilePath))
+                    {
+                        // read the 1st header row and do nothing.
+                        sr.ReadLine();
+                        // read all the subsequence row.
+                        string fileString;
+                        while ((fileString = sr.ReadLine()) != null)
+						{
+                            string[] row = fileString.Split(',');
+							StoredSymbolData storedSymbolData = new StoredSymbolData
+							{
+                                AtrValue = Convert.ToDouble(row[0]),
+                                Symbol = row[1]
+							};
+                            storedSymbolDatas.Add(storedSymbolData);
+						}
+                    }
+                    return true;
+                } catch (Exception e)
+                {
+                    _robot.Print("Failed to read storage file: ");
+                    _robot.Print(e.Message);
+                    return false;
+                }
+            }
+
+            private bool WriteToFile()
+            {
+                try
+                {
+                    Type type = typeof(StoredSymbolData);
+                    var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).OrderBy(property => property.Name);
+                    using (StreamWriter outputFile = new StreamWriter(_storageFilePath, false))
+                    {
+                        outputFile.WriteLine(string.Join(",", properties.Select(property => property.Name)));
+                        foreach (var storedSymbolData in storedSymbolDatas)
+                        {
+                            outputFile.WriteLine(string.Join(",", properties.Select(property => property.GetValue(storedSymbolData, null))));
+                        }
+                    }
+                    return true;
+                } catch (Exception e)
+                {
+                    _robot.Print("Failed to write to storage file: ");
+                    _robot.Print(e.Message);
+                    return false;
+                }
+            }
+
+            public bool UpdateFile(StoredSymbolData newStoredSymbolData)
+            {
+                // make sure the storedSymbolDatas contain the latest data.
+                if (!ReadFromFile())
+                {
+                    return false;
+                }
+                // update storedSymbolDatas.
+                bool updated = false;
+				foreach (var storedSymbolData in storedSymbolDatas)
+				{
+                    if (storedSymbolData.Symbol == newStoredSymbolData.Symbol)
+					{
+                        storedSymbolData.AtrValue = newStoredSymbolData.AtrValue;
+                        updated = true;
+					}
+				}
+                if (!updated)
+				{
+                    storedSymbolDatas.Add(newStoredSymbolData);
+				}
+                // write storedSymbolDatas to file.
+                if (!WriteToFile())
+                {
+                    return false;
+                }
+                return true;
+            }
+
+            public StoredSymbolData GetStoredSymbolData(string symbol)
+            {
+                // make sure the storedSymbolDatas contain the latest data.
+                if (ReadFromFile())
+                {
+					foreach (var storedSymbolData in storedSymbolDatas)
+					{
+                        if (storedSymbolData.Symbol == symbol)
+						{
+                            return storedSymbolData;
+						}
+					}
+                }
+                return null;
+            }
+        }
+
+        public class StoredSymbolData
+        {
+            public string Symbol { get; set; }
+            public double AtrValue { get; set; }
+        }
     }
 }
