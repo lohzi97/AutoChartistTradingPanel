@@ -18,7 +18,7 @@ namespace cAlgo.Robots
         [Parameter("Horizontal Position", Group = "Panel alignment", DefaultValue = HorizontalAlignment.Left)]
         public HorizontalAlignment PanelHorizontalAlignment { get; set; }
 
-        [Parameter("Volume", Group = "Default Trade parameters", DefaultValue = 2000)]
+        [Parameter("Volume", Group = "Default Trade parameters")]
         public int Volume { get; set; }
 
         [Parameter("Trail Stop ATR", Group = "Default Trade parameters", DefaultValue = 1.5)]
@@ -39,7 +39,7 @@ namespace cAlgo.Robots
         [Parameter("Moving Average", Group = "ATR parameters", DefaultValue = MovingAverageType.Exponential)]
         public MovingAverageType AtrMaType { get; set; }
 
-        [Parameter("File Path", Group = "Storage", DefaultValue = "D:\\Downloads HDD\\storage.csv")]
+        [Parameter("File Path", Group = "Storage")]
         public String StorageFilePath { get; set; }
 
         private const string label = "AutoChartistTradingPanel";
@@ -49,6 +49,11 @@ namespace cAlgo.Robots
 
         protected override void OnStart()
         {
+            if (StorageFilePath == "")
+			{
+                throw new Exception("Storage File Path is empty!");
+			}
+            
             Positions.Closed += OnPositionsClosed;
 
             averageTrueRange = Indicators.AverageTrueRange(AtrPeriod, AtrMaType);
@@ -141,6 +146,10 @@ namespace cAlgo.Robots
                 }
                 Print("Successfully Moved StopLoss.");
             }
+            else if (positions.Length == 0)
+			{
+                csvFile.RemoveStoredSymbolData(position.SymbolName);
+			}
         }
 
         public class TradingPanel : CustomControl
@@ -169,6 +178,7 @@ namespace cAlgo.Robots
                 _stopLossAtr = stopLossAtr;
                 _takeProfitAtr = takeProfitAtr;
                 AddChild(CreateTradingPanel(volume, trailStopAtr, expireAfterMinutes));
+                UpdateOutputInfoWithStorageFile();
             }
 
             private ControlBase CreateTradingPanel(double volume, double trailStopAtr, int expireAfterMinutes)
@@ -408,6 +418,15 @@ namespace cAlgo.Robots
                 return stackPanel;
             }*/
 
+            private void UpdateOutputInfoWithStorageFile()
+			{
+                StoredSymbolData storedSymbolData = _csvFile.GetStoredSymbolData(_robot.Symbol.Name);
+                if (storedSymbolData != null)
+				{
+                    UpdateOutputInfo(AtrValueSnapshotOutputKey, storedSymbolData.AtrValue.ToString());
+                }
+            }
+
             private void ExecuteOrderAsync(TradeType tradeType)
             {
                 // read the input from user
@@ -534,7 +553,7 @@ namespace cAlgo.Robots
                 UpdateOutputInfo(AtrValueSnapshotOutputKey, atr.ToString());
                 //UpdateOutputInfo(TrailStopAtrSnapshotOutputKey, GetValueFromInput(TrailAtrInputKey, 0).ToString());
 
-                StoredSymbolData storedSymbolData = new StoredSymbolData()
+                StoredSymbolData storedSymbolData = new StoredSymbolData 
                 {
                     Symbol = _robot.Symbol.Name,
                     AtrValue = atr
@@ -553,7 +572,7 @@ namespace cAlgo.Robots
             {
                 _outputMap[outputKey].Text = updateValue;
             }
-
+            
             public double GetOutputInfoValue(string outputKey)
             {
                 double value;
@@ -683,15 +702,15 @@ namespace cAlgo.Robots
                         // read all the subsequence row.
                         string fileString;
                         while ((fileString = sr.ReadLine()) != null)
-						{
+                        {
                             string[] row = fileString.Split(',');
-							StoredSymbolData storedSymbolData = new StoredSymbolData
-							{
+                            StoredSymbolData storedSymbolData = new StoredSymbolData 
+                            {
                                 AtrValue = Convert.ToDouble(row[0]),
                                 Symbol = row[1]
-							};
+                            };
                             storedSymbolDatas.Add(storedSymbolData);
-						}
+                        }
                     }
                     return true;
                 } catch (Exception e)
@@ -734,18 +753,18 @@ namespace cAlgo.Robots
                 }
                 // update storedSymbolDatas.
                 bool updated = false;
-				foreach (var storedSymbolData in storedSymbolDatas)
-				{
+                foreach (var storedSymbolData in storedSymbolDatas)
+                {
                     if (storedSymbolData.Symbol == newStoredSymbolData.Symbol)
-					{
+                    {
                         storedSymbolData.AtrValue = newStoredSymbolData.AtrValue;
                         updated = true;
-					}
-				}
+                    }
+                }
                 if (!updated)
-				{
+                {
                     storedSymbolDatas.Add(newStoredSymbolData);
-				}
+                }
                 // write storedSymbolDatas to file.
                 if (!WriteToFile())
                 {
@@ -759,16 +778,34 @@ namespace cAlgo.Robots
                 // make sure the storedSymbolDatas contain the latest data.
                 if (ReadFromFile())
                 {
-					foreach (var storedSymbolData in storedSymbolDatas)
-					{
+                    foreach (var storedSymbolData in storedSymbolDatas)
+                    {
                         if (storedSymbolData.Symbol == symbol)
-						{
+                        {
                             return storedSymbolData;
-						}
-					}
+                        }
+                    }
                 }
                 return null;
             }
+
+            public bool RemoveStoredSymbolData(string symbol)
+			{
+                // make sure the storedSymbolDatas contain the latest data.
+                if (!ReadFromFile())
+				{
+                    return false;
+                }
+                // rmeove the data
+                storedSymbolDatas.RemoveAll(storedSymbolData => storedSymbolData.Symbol == symbol);
+                // write storedSymbolDatas to file.
+                if (!WriteToFile())
+                {
+                    return false;
+                }
+                return true;
+            }
+
         }
 
         public class StoredSymbolData
