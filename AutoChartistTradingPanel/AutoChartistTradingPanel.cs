@@ -50,10 +50,10 @@ namespace cAlgo.Robots
         protected override void OnStart()
         {
             if (StorageFilePath == "")
-			{
+            {
                 throw new Exception("Storage File Path is empty!");
-			}
-            
+            }
+
             Positions.Closed += OnPositionsClosed;
 
             averageTrueRange = Indicators.AverageTrueRange(AtrPeriod, AtrMaType);
@@ -147,9 +147,9 @@ namespace cAlgo.Robots
                 Print("Successfully Moved StopLoss.");
             }
             else if (positions.Length == 0)
-			{
+            {
                 csvFile.RemoveStoredSymbolData(position.SymbolName);
-			}
+            }
         }
 
         public class TradingPanel : CustomControl
@@ -419,10 +419,10 @@ namespace cAlgo.Robots
             }*/
 
             private void UpdateOutputInfoWithStorageFile()
-			{
+            {
                 StoredSymbolData storedSymbolData = _csvFile.GetStoredSymbolData(_robot.Symbol.Name);
                 if (storedSymbolData != null)
-				{
+                {
                     UpdateOutputInfo(AtrValueSnapshotOutputKey, storedSymbolData.AtrValue.ToString());
                 }
             }
@@ -572,7 +572,7 @@ namespace cAlgo.Robots
             {
                 _outputMap[outputKey].Text = updateValue;
             }
-            
+
             public double GetOutputInfoValue(string outputKey)
             {
                 double value;
@@ -790,10 +790,10 @@ namespace cAlgo.Robots
             }
 
             public bool RemoveStoredSymbolData(string symbol)
-			{
+            {
                 // make sure the storedSymbolDatas contain the latest data.
                 if (!ReadFromFile())
-				{
+                {
                     return false;
                 }
                 // rmeove the data
